@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Data.Odbc;
+using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -11,11 +12,14 @@ namespace FolderSyncClient.Models
     class FileModel
     {
         public string name;
-        public string path;
+		public string oldName;
+		public string path;
+		public string oldPath;
         public DateTime lastChange;
 	    public FileStatus status;
+		public byte[] fileBytes;
 
-        public override bool Equals(object obj)
+		public override bool Equals(object obj)
         {
             if (!(obj is FileModel)) return false;
 
@@ -32,5 +36,6 @@ namespace FolderSyncClient.Models
 		Renamed,
 		Edited,
 		Deleted,
+		Null,
 	}
 }

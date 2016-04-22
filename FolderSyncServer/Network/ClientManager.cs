@@ -27,8 +27,6 @@ namespace FolderSyncServer.Network
 		/// <summary>
 		/// Initializes connection manager.
 		/// </summary>
-		/// <param name="host"></param>
-		/// <param name="port"></param>
 		private ClientManager()
 		{
 		}
@@ -43,15 +41,6 @@ namespace FolderSyncServer.Network
 		{
 			this.Host = host;
 			this.Port = port;
-		}
-
-		/// <summary>
-		/// Creates new connection  manager with "Any" as host.
-		/// </summary>
-		/// <param name="port"></param>
-		public ClientManager(int port)
-			: this("0.0.0.0", port)
-		{
 		}
 
 		/// <summary>
