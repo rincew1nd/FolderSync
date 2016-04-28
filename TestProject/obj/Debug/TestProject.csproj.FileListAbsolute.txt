@@ -1,0 +1,6 @@
+C:\Users\titov\Documents\Visual Studio 2013\Projects\FolderSyncServer\TestProject\bin\Debug\TestProject.exe.config
+C:\Users\titov\Documents\Visual Studio 2013\Projects\FolderSyncServer\TestProject\bin\Debug\TestProject.exe
+C:\Users\titov\Documents\Visual Studio 2013\Projects\FolderSyncServer\TestProject\bin\Debug\TestProject.pdb
+C:\Users\titov\Documents\Visual Studio 2013\Projects\FolderSyncServer\TestProject\obj\Debug\TestProject.csprojResolveAssemblyReference.cache
+C:\Users\titov\Documents\Visual Studio 2013\Projects\FolderSyncServer\TestProject\obj\Debug\TestProject.exe
+C:\Users\titov\Documents\Visual Studio 2013\Projects\FolderSyncServer\TestProject\obj\Debug\TestProject.pdb

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using FolderSyncClient.Files;
@@ -20,7 +22,7 @@ namespace FolderSyncClient
 		public void Run()
 		{
 			// Folder to monitor
-			string path = "E:\\test";
+			var path = "E:\\test";
 
 			// Init of main things
 			_fileWatcher = new FileWatcher(path);
@@ -30,6 +32,43 @@ namespace FolderSyncClient
 			// Nonify FileChanger about changed files in folder
 			_fileWatcher.OnFilesChanged += _folderChanger.CheckFilesInQuery;
 			_folderChanger.OnFileSend += _updClient.Send;
+
+			{
+				byte[] data = new byte[1024];
+				string input, stringData;
+
+				UdpClient server = new UdpClient("127.0.0.1", 9050);
+				IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+				
+				string welcome = "Клиент успешно подключился!";
+				data = Encoding.UTF8.GetBytes(welcome);
+				server.Send(data, data.Length);
+				
+				data = server.Receive(ref sender);
+				
+				Console.Write("Сообщение принято от {0}:", sender.ToString());
+				stringData = Encoding.UTF8.GetString(data, 0, data.Length);
+				Console.WriteLine(stringData);
+				
+				while (true)
+				{
+					data = new byte[1024];
+					Console.Write("\r\n>");
+					input = Console.ReadLine();
+					
+					data = Encoding.UTF8.GetBytes(input);
+					server.Send(data, data.Length);
+					
+					if (input == "exit") break;
+
+					data = server.Receive(ref sender);
+					stringData = Encoding.UTF8.GetString(data, 0, data.Length);
+					Console.Write("<");
+					Console.WriteLine(stringData);
+				}
+				Console.WriteLine("Остановка клиента...");
+				server.Close();
+			}
 
 			Console.Read();
 		}

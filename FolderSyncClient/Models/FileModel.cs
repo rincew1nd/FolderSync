@@ -16,7 +16,7 @@ namespace FolderSyncClient.Models
 		public string path;
 		public string oldPath;
         public DateTime lastChange;
-	    public FileStatus status;
+	    public WatcherChangeTypes status;
 		public byte[] fileBytes;
 
 		public override bool Equals(object obj)
@@ -29,13 +29,4 @@ namespace FolderSyncClient.Models
                    this.path.Equals(two.path);
         }
     }
-	
-	public enum FileStatus
-	{
-		Added,
-		Renamed,
-		Edited,
-		Deleted,
-		Null,
-	}
 }

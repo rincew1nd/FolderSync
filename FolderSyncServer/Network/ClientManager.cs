@@ -1,134 +1,106 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using FolderSyncServer;
 
 namespace FolderSyncServer.Network
 {
 	class ClientManager
 	{
-		private Socket _socket;
+		private Socket serverSocket = null;
+		private List<EndPoint> clientList = new List<EndPoint>();
+		private List<Tuple<EndPoint, byte[]>> dataList = new List<Tuple<EndPoint, byte[]>>();
+		private byte[] _buffer = new byte[1025 * 500];
+		private int _port;
 
-		/// <summary>
-		/// IP this manager listens on.
-		/// </summary>
-		public string Host { get; protected set; }
-
-		/// <summary>
-		/// Port this manager listens on.
-		/// </summary>
-		public int Port { get; protected set; }
-
-		/// <summary>
-		/// Address this manager listens on.
-		/// </summary>
-		public string Address => $"{this.Host}:{this.Port}";
-
-		/// <summary>
-		/// Initializes connection manager.
-		/// </summary>
-		private ClientManager()
+		public List<Tuple<EndPoint, byte[]>> DataList
 		{
+			private set { this.dataList = value; }
+			get { return (this.dataList); }
 		}
 
-		/// <summary>
-		/// Creates new connection manager.
-		/// </summary>
-		/// <param name="host"></param>
-		/// <param name="port"></param>
-		public ClientManager(string host, int port)
-			: this()
+		public ClientManager(int port)
 		{
-			this.Host = host;
-			this.Port = port;
+			this._port = port;
 		}
 
-		/// <summary>
-		/// Starts accepting connections.
-		/// </summary>
 		public void Start()
 		{
-			this.ResetSocket();
+			this.serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+			//this.serverSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+			this.serverSocket.Bind(new IPEndPoint(IPAddress.Parse("127.0.0.1"), this._port));
 
-			var ipAddress = this.Host == "0.0.0.0" ? IPAddress.Any : IPAddress.Parse(this.Host);
-
-			_socket.Bind(new IPEndPoint(ipAddress, this.Port));
-			_socket.Listen(10);
-
-			this.BeginAccept();
+			EndPoint newClientEp = new IPEndPoint(IPAddress.Any, 0);
+			this.serverSocket.BeginReceiveFrom(this._buffer, 0, this._buffer.Length, SocketFlags.None, ref newClientEp, DoReceiveFrom, newClientEp);
 		}
 
-		/// <summary>
-		/// Begins accepting of incoming connections.
-		/// </summary>
-		private void BeginAccept()
+		private void DoReceiveFrom(IAsyncResult iar)
 		{
-			_socket.BeginAccept(this.OnAccept, null);
-		}
-
-		/// <summary>
-		/// Shuts down current socket and creates a new one.
-		/// </summary>
-		private void ResetSocket()
-		{
-			if (_socket != null)
-			{
-				try
-				{
-					_socket.Shutdown(SocketShutdown.Both);
-				}
-				catch
-				{
-				}
-				try
-				{
-					_socket.Close(2);
-				}
-				catch
-				{
-				}
-			}
-
-			_socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-		}
-
-		/// <summary>
-		/// Called when a new client connects.
-		/// </summary>
-		/// <param name="result"></param>
-		private void OnAccept(IAsyncResult result)
-		{
+			var welcome = "Клиент успешно подключился!";
+			byte[] data = Encoding.UTF8.GetBytes(welcome);
+			this.serverSocket.Send(data, SocketFlags.None);
 			try
 			{
-				var connectionSocket = _socket.EndAccept(result);
+				EndPoint clientEP = new IPEndPoint(IPAddress.Any, 0);
+				int dataLen = 0;
+				//byte[] data = null;
 
-				var connection = new Connection();
-				connection.SetSocket(connectionSocket);
-				connection.Closed += this.OnConnectionClosed;
-				connection.BeginReceive();
+				try
+				{
+					dataLen = this.serverSocket.EndReceiveFrom(iar, ref clientEP);
+					data = new byte[dataLen];
+					Array.Copy(this._buffer, data, dataLen);
+				}
+				catch (Exception e)
+				{
+					Console.WriteLine(e.Message);
+				}
+				finally
+				{
+					EndPoint newClientEP = new IPEndPoint(IPAddress.Any, 0);
+					this.serverSocket.BeginReceiveFrom(this._buffer, 0, this._buffer.Length, SocketFlags.None, ref newClientEP, DoReceiveFrom, newClientEP);
+				}
 
-				Console.WriteLine($"Connection established from {connection.Address}");
+				if (!this.clientList.Any(client => client.Equals(clientEP)))
+					this.clientList.Add(clientEP);
+
+				DataList.Add(Tuple.Create(clientEP, data));
 			}
 			catch (ObjectDisposedException)
 			{
 			}
-			catch (Exception ex)
+		}
+
+		public void SendTo(byte[] data, EndPoint clientEP)
+		{
+			try
 			{
-				Console.WriteLine("While accepting connection.");
+				this.serverSocket.SendTo(data, clientEP);
 			}
-			finally
+			catch (System.Net.Sockets.SocketException)
 			{
-				this.BeginAccept();
+				this.clientList.Remove(clientEP);
 			}
 		}
 
-		/// <summary>
-		/// Raised when a connection closes.
-		/// </summary>
-		/// <param name="sender"></param>
-		/// <param name="e"></param>
-		private void OnConnectionClosed(object sender, EventArgs e)
+		public void SendToAll(byte[] data)
 		{
+			foreach (var client in this.clientList)
+			{
+				this.SendTo(data, client);
+			}
+		}
+
+		public void Stop()
+		{
+			this.serverSocket.Close();
+			this.serverSocket = null;
+
+			this.dataList.Clear();
+			this.clientList.Clear();
 		}
 	}
 }

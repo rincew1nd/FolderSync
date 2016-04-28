@@ -48,9 +48,9 @@ namespace FolderSyncClient.Files
                                | NotifyFilters.FileName | NotifyFilters.DirectoryName,
                 Filter = "*.*"
             };
-            _watcher.Changed += (sender, args) => this.Changed(sender, args, FileStatus.Edited);
-            _watcher.Created += (sender, args) => this.Changed(sender, args, FileStatus.Added);
-			_watcher.Deleted += (sender, args) => this.Changed(sender, args, FileStatus.Deleted);
+            _watcher.Changed += this.Changed;
+            _watcher.Created += this.Changed;
+			_watcher.Deleted += this.Changed;
 			_watcher.Renamed += this.Renamed;
             _watcher.EnableRaisingEvents = true;
 
@@ -59,53 +59,17 @@ namespace FolderSyncClient.Files
 	        this._aTimer.Elapsed += (sender, args) => this.OnFilesChanged.Invoke(_changedFiles);
 	        this._aTimer.Elapsed += ClearChangedFiles;
 	        this._aTimer.Enabled = true;
-        }
+		}
 
-        /// <summary>
-        /// Add changed files to list of changed files (captain obvious)
-        /// </summary>
-        /// <param name="source"></param>
-        /// <param name="args"></param>
-        /// <param name="status"></param>
-        private void Changed(object source, FileSystemEventArgs args, FileStatus status)
-        {
-	        switch (status)
-	        {
-		        case FileStatus.Added:
-					AddFileToFileList(args, status);
-			        break;
-				case FileStatus.Deleted:
-					DeleteAllFromFileList(args);
-					AddFileToFileList(args, status);
-			        break;
-				case FileStatus.Edited:
-			        switch (GetLastFileStatus(args))
-			        {
-						case FileStatus.Added:
-							DeleteAllFromFileList(args);
-							AddFileToFileList(args, FileStatus.Added);
-							break;
-						case FileStatus.Deleted:
-							DeleteAllFromFileList(args);
-							AddFileToFileList(args, FileStatus.Deleted);
-							AddFileToFileList(args, FileStatus.Added);
-							break;
-						case FileStatus.Renamed:
-							Console.WriteLine("That cant be happening! >.<");
-							break;
-						case FileStatus.Null:
-							AddFileToFileList(args, status);
-							break;
-						default:
-							break;
-					}
-					break;
-				default:
-					Console.WriteLine("Very strange status passed!");
-			        break;
-	        }
-        }
+		/// <summary>
+		/// Clear changed files
+		/// </summary>
+		public void ClearChangedFiles(object source, ElapsedEventArgs e)
+		{
+			_changedFiles.Clear();
+		}
 
+		#region RenamedEventArgs
 
 		/// <summary>
 		/// Add renamed files to list of changed files (captain obvious)
@@ -114,163 +78,47 @@ namespace FolderSyncClient.Files
 		/// <param name="args"></param>
 		public void Renamed(object source, RenamedEventArgs args)
 		{
-			switch (GetLastFileStatus(args.OldName, args.OldFullPath))
+			var lastAction = GetLastFile(args);
+
+			if (lastAction == null)
+				AddFile(args);
+			else
 			{
-				case FileStatus.Added:
-					break;
-				case FileStatus.Edited:
-					DeleteAllFromFileList(args);
-					AddFileToFileList(args.OldName, args.OldFullPath, FileStatus.Deleted);
-					AddFileToFileList(args.Name, args.FullPath, FileStatus.Added);
-					break;
-				case FileStatus.Deleted:
-					break;
-				case FileStatus.Renamed:
-					var fileModel = GetLastFile(args);
-					DeleteFromFileList(args.OldName, args.OldFullPath, new List<FileStatus>(){FileStatus.Renamed});
-					_changedFiles.Add(
-						new FileModel()
-						{
-							name = args.Name,
-							path = args.FullPath,
-							oldName = fileModel.oldName,
-							oldPath = fileModel.oldPath,
-							lastChange = DateTime.Now,
-							status = FileStatus.Renamed,
-						}
-					);
-					break;
-				case FileStatus.Null:
-					AddFileToFileList(args, FileStatus.Renamed);
-					break;
-				default:
-					break;
+				_changedFiles.Remove(lastAction);
+				switch (lastAction.status)
+				{
+					case WatcherChangeTypes.Created:
+						AddFile(new FileSystemEventArgs(WatcherChangeTypes.Created, args.FullPath, args.Name));
+						break;
+					case WatcherChangeTypes.Changed:
+						AddFile(new FileSystemEventArgs(WatcherChangeTypes.Deleted, lastAction.path, lastAction.name));
+						AddFile(new FileSystemEventArgs(WatcherChangeTypes.Created, args.FullPath, args.Name));
+						break;
+					case WatcherChangeTypes.Deleted:
+						_changedFiles.Add(lastAction);
+						break;
+					case WatcherChangeTypes.Renamed:
+						AddFile(new RenamedEventArgs(WatcherChangeTypes.Renamed, lastAction.oldPath, lastAction.name, lastAction.oldName));
+						break;
+				}
 			}
 		}
 
 		/// <summary>
-		/// Delete all files in changed files list with given statuses
+		/// Create FileModel
 		/// </summary>
-		/// <param name="file">FileModel</param>
-		/// <param name="statuses">List of statuses</param>
-		public void DeleteFromFileList(FileModel file, List<FileStatus> statuses)
-	    {
-			foreach (var changedFile in this._changedFiles.Where(z => z.name == file.name && z.path == file.path && statuses.Contains(z.status)).ToList())
-				this._changedFiles.Remove(changedFile);
-		}
-
-		/// <summary>
-		/// Delete all files in changed files list with given statuses
-		/// </summary>
-		/// <param name="name">File name</param>
-		/// <param name="path">File path</param>
-		/// <param name="statuses">List of statuses</param>
-		public void DeleteFromFileList(string name, string path, List<FileStatus> statuses)
-	    {
-		    DeleteFromFileList(new FileModel() { name = name, path = path }, statuses);
-	    }
-
-		/// <summary>
-		/// Delete all files in changed files list with all statuses
-		/// </summary>
-		/// <param name="name">File name</param>
-		/// <param name="path">File path</param>
-		public void DeleteAllFromFileList(string name, string path)
-	    {
-		    DeleteFromFileList(new FileModel() { name = name, path = path }, new List<FileStatus>() {FileStatus.Added, FileStatus.Deleted, FileStatus.Edited, FileStatus.Renamed});
-	    }
-
-	    /// <summary>
-	    /// Delete all files in changed files list with all statuses
-	    /// </summary>
-	    /// <param name="args"></param>
-	    public void DeleteAllFromFileList(FileSystemEventArgs args)
-	    {
-		    DeleteFromFileList(new FileModel() { name = args.Name, path = args.FullPath }, new List<FileStatus>() {FileStatus.Added, FileStatus.Deleted, FileStatus.Edited, FileStatus.Renamed});
-	    }
-
-	    /// <summary>
-	    /// Add changed file to list of changed files
-	    /// </summary>
-	    /// <param name="file">FileModel</param>
-	    public void AddFileToFileList(FileModel file)
-	    {
-		    _changedFiles.Add(file);
-	    }
-
-	    /// <summary>
-	    /// Add changed file to list of changed files
-	    /// </summary>
-	    /// <param name="args"></param>
-	    /// <param name="status"></param>
-	    public void AddFileToFileList(RenamedEventArgs args, FileStatus status)
-	    {
-		    _changedFiles.Add(new FileModel()
-		    {
-			    name = args.Name,
+		public FileModel CreateFileModel(RenamedEventArgs args, WatcherChangeTypes status)
+		{
+			return new FileModel()
+			{
+				name = args.Name,
 				path = args.FullPath,
 				oldName = args.OldName,
 				oldPath = args.OldFullPath,
 				lastChange = DateTime.Now,
 				status = status
-		    });
-	    }
-
-		/// <summary>
-		/// Add changed file to list of changed files
-		/// </summary>
-		/// <param name="name">File name</param>
-		/// <param name="path">File path</param>
-		/// <param name="status">File status</param>
-		public void AddFileToFileList(string name, string path, FileStatus status)
-	    {
-			AddFileToFileList(new FileModel()
-			{
-				name = name,
-				path = path,
-				lastChange = DateTime.Now,
-				status = status
-			});
-	    }
-
-	    /// <summary>
-	    /// Add changed file to list of changed files
-	    /// </summary>
-	    /// <param name="args"></param>
-	    /// <param name="status">File status</param>
-	    public void AddFileToFileList(FileSystemEventArgs args, FileStatus status)
-	    {
-			AddFileToFileList(new FileModel()
-			{
-				name = args.Name,
-				path = args.FullPath,
-				lastChange = DateTime.Now,
-				status = status
-			});
-	    }
-
-		/// <summary>
-		/// Get last status of changed file
-		/// </summary>
-		/// <param name="name"></param>
-		/// <param name="path"></param>
-		/// <returns></returns>
-	    public FileStatus GetLastFileStatus(string name, string path)
-	    {
-		    return this._changedFiles.Any(z => z.name == name && z.path == path) ?
-				this._changedFiles.Where(z => z.name == name && z.path == path).Select(z => z.status).First() : FileStatus.Null;
+			};
 		}
-
-		/// <summary>
-		/// Get last status of changed file
-		/// </summary>
-		/// <param name="args"></param>
-		/// <returns></returns>
-		public FileStatus GetLastFileStatus(FileSystemEventArgs args)
-	    {
-		    return this._changedFiles.Any(z => z.name == args.Name && z.path == args.FullPath) ?
-				this._changedFiles.Where(z => z.name == args.Name && z.path == args.FullPath).Select(z => z.status).First() : FileStatus.Null;
-	    }
 
 		/// <summary>
 		/// Get last status of changed file
@@ -278,17 +126,152 @@ namespace FolderSyncClient.Files
 		/// <param name="args"></param>
 		/// <returns></returns>
 		public FileModel GetLastFile(RenamedEventArgs args)
-	    {
-		    return this._changedFiles.Any(z => z.name == args.OldName && z.path == args.OldFullPath) ?
-				this._changedFiles.Where(z => z.name == args.OldName && z.path == args.OldFullPath).First() : new FileModel();
-	    }
+		{
+			var lastFileModel = this._changedFiles.Where(z => z.name == args.OldName && z.path == args.OldFullPath).ToList();
+			return (lastFileModel.Count == 0) ? null : lastFileModel.First();
+		}
+		
+		/// <summary>
+		/// Add filemodel to collection of changed files
+		/// </summary>
+		/// <param name="args"></param>
+		private void AddFile(RenamedEventArgs args)
+		{
+			_changedFiles.Add(CreateFileModel(args, args.ChangeType));
+		}
 
 		/// <summary>
-		/// Clear changed files
+		/// Add filemodel to collection of changed files
 		/// </summary>
-	    public void ClearChangedFiles(object source, ElapsedEventArgs e)
+		/// <param name="args"></param>
+		/// <param name="status"></param>
+		private void AddFile(RenamedEventArgs args, WatcherChangeTypes status)
+		{
+			_changedFiles.Add(CreateFileModel(args, status));
+		}
+		#endregion
+
+		#region FileSystemEventArgs
+
+		/// <summary>
+		/// Add changed files to list of changed files (captain obvious)
+		/// </summary>
+		/// <param name="source"></param>
+		/// <param name="args"></param>
+		/// <param name="status"></param>
+		private void Changed(object source, FileSystemEventArgs args)
+		{
+			var lastAction = GetLastFile(args);
+
+			if (lastAction == null)
+				AddFile(args);
+			else
+			{
+				_changedFiles.Remove(lastAction);
+				switch (args.ChangeType)
+				{
+					case WatcherChangeTypes.Created:
+						switch (lastAction.status)
+						{
+							case WatcherChangeTypes.Deleted:
+								break;
+							case WatcherChangeTypes.Changed:
+								AddFile(args);
+								break;
+							case WatcherChangeTypes.Renamed:
+								AddFile(new FileSystemEventArgs(WatcherChangeTypes.Deleted, lastAction.path, lastAction.name));
+								AddFile(args);
+								break;
+							case WatcherChangeTypes.Created:
+								AddFile(args);
+								break;
+						}
+						break;
+					case WatcherChangeTypes.Changed:
+						switch (lastAction.status)
+						{
+							case WatcherChangeTypes.Deleted:
+								AddFile(args);
+								break;
+							case WatcherChangeTypes.Changed:
+								AddFile(args);
+								break;
+							case WatcherChangeTypes.Renamed:
+								AddFile(new FileSystemEventArgs(WatcherChangeTypes.Deleted, lastAction.oldPath, lastAction.oldName));
+								AddFile(new FileSystemEventArgs(WatcherChangeTypes.Created, args.FullPath, args.Name));
+								break;
+							case WatcherChangeTypes.Created:
+								_changedFiles.Add(lastAction);
+								break;
+						}
+						break;
+					case WatcherChangeTypes.Deleted:
+						switch (lastAction.status)
+						{
+							case WatcherChangeTypes.Deleted:
+								AddFile(args);
+								break;
+							case WatcherChangeTypes.Changed:
+								_changedFiles.Add(lastAction);
+								break;
+							case WatcherChangeTypes.Renamed:
+								AddFile(new FileSystemEventArgs(WatcherChangeTypes.Deleted, lastAction.path, lastAction.name));
+								AddFile(new FileSystemEventArgs(WatcherChangeTypes.Deleted, lastAction.oldPath, lastAction.oldName));
+								break;
+							case WatcherChangeTypes.Created:
+								break;
+						}
+						break;
+					default:
+						Console.WriteLine($"ERROR in FileWatcher! Wrong change type {args.ChangeType}!");
+						break;
+				}
+			}
+		}
+
+		/// <summary>
+		/// Create FileModel
+		/// </summary>
+		public FileModel CreateFileModel(FileSystemEventArgs args, WatcherChangeTypes status)
+		{
+			return new FileModel()
+			{
+				name = args.Name,
+				path = args.FullPath,
+				lastChange = DateTime.Now,
+				status = status
+			};
+		}
+
+		/// <summary>
+		/// Get last status of changed file
+		/// </summary>
+		/// <param name="args"></param>
+		/// <returns></returns>
+		public FileModel GetLastFile(FileSystemEventArgs args)
+		{
+			var lastFileModel = this._changedFiles.Where(z => z.name == args.Name && z.path == args.FullPath).ToList();
+			return (lastFileModel.Count == 0) ? null : lastFileModel.First();
+		}
+
+		/// <summary>
+		/// Add filemodel to collection of changed files
+		/// </summary>
+		/// <param name="args"></param>
+	    private void AddFile(FileSystemEventArgs args)
 	    {
-		    _changedFiles.Clear();
+		    _changedFiles.Add(CreateFileModel(args, args.ChangeType));
 	    }
+
+	    /// <summary>
+	    /// Add filemodel to collection of changed files
+	    /// </summary>
+	    /// <param name="args"></param>
+	    /// <param name="status"></param>
+	    private void AddFile(FileSystemEventArgs args, WatcherChangeTypes status)
+	    {
+		    _changedFiles.Add(CreateFileModel(args, status));
+	    }
+		#endregion
 	}
 }
