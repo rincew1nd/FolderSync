@@ -174,6 +174,8 @@ namespace FolderSyncClient.Files
 						switch (lastAction.status)
 						{
 							case WatcherChangeTypes.Deleted:
+								_changedFiles.Add(lastAction);
+								AddFile(args);
 								break;
 							case WatcherChangeTypes.Changed:
 								AddFile(args);

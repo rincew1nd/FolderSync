@@ -19,7 +19,7 @@ namespace FolderSyncClient.Network
 			_chunks = new List<byte[]>();
 		}
 
-		public void SendFile(Socket socket, FileModel file)
+		public bool SendFile(Socket socket, FileModel file)
 		{
 			_buffer = File.ReadAllBytes(file.path);
 			_chunks = new List<byte[]>();
@@ -32,8 +32,27 @@ namespace FolderSyncClient.Network
 				_chunks.Add(buffer);
 			}
 
-			var fileSendRequest = $"Receive file {_chunks.Count}";
-			socket.s
+			_buffer = new byte[1024];
+
+			var operation = Encoding.UTF8.GetBytes("Receive");
+			Buffer.BlockCopy(BitConverter.GetBytes(operation.Length), 0, _buffer, 0, 4);
+			Buffer.BlockCopy(operation, 0, _buffer, 4, operation.Length);
+			Buffer.BlockCopy(BitConverter.GetBytes(_chunks.Count), 0, _buffer, 4 + operation.Length, 4);
+			//TODO Send info | Catch exception
+
+			foreach (var chunk in _chunks)
+			{
+				try
+				{
+					//TODO Send chunk
+				}
+				catch (Exception)
+				{
+					return false;
+				}
+			}
+
+			return true;
 		}
 	}
 }

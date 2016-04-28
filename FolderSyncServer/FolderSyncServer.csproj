@@ -46,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FileReceiver.cs" />
     <Compile Include="Network\ClientManager.cs" />
     <Compile Include="Models\ClientModel.cs" />
     <Compile Include="Program.cs" />

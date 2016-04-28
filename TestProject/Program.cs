@@ -23,7 +23,7 @@ namespace TestProject
 		{
 			EndPoint endPoint = new IPEndPoint(IPAddress.Any, 80);
 			var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-			socket.Connected()
+			//socket.Connected();
 		}
 	}
 }

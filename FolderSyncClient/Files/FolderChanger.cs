@@ -12,7 +12,7 @@ namespace FolderSyncClient
 		private string _folderToChange;
 
 		// Event + delegate for notify client to send info about changes
-		public delegate void FileWatherEventHandler(string fileJson);
+		public delegate void FileWatherEventHandler(List<FileModel> changedFiles);
 		public event FileWatherEventHandler OnFileSend;
 
 		public FolderChanger(string path)
@@ -23,19 +23,12 @@ namespace FolderSyncClient
 
 		public void CheckFilesInQuery(List<FileModel> files)
 		{
-			//TODO check query for already added files
-			SendFile(files);
-		}
-
-		public void SendFile(List<FileModel> files)
-		{
 			foreach (var fileModel in files)
 			{
-				fileModel.fileBytes = File.ReadAllBytes(fileModel.path);
-				var json = new JavaScriptSerializer().Serialize(fileModel);
-				Console.WriteLine(json);
-				OnFileSend.Invoke(json ?? "");
+				Console.WriteLine($"{fileModel.name} -- {fileModel.status}");
 			}
+			//TODO check query for already added files
+			//OnFileSend.Invoke(files);
 		}
 	}
 }
