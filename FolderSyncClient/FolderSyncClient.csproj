@@ -48,8 +48,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Files\FileWatcherv2.cs" />
-    <Compile Include="Files\FileWatcher.cs" />
+    <Compile Include="Files\FileWatcherv.cs" />
     <Compile Include="Files\FolderChanger.cs" />
     <Compile Include="FolderSyncClient.cs" />
     <Compile Include="Models\FileModel.cs" />

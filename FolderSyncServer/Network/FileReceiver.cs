@@ -9,7 +9,6 @@ namespace FolderSyncServer
 {
 	class FileReceiver
 	{
-
 		public FileReceiver()
 		{
 			

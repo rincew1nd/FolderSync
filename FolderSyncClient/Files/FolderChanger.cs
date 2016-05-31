@@ -18,7 +18,6 @@ namespace FolderSyncClient
 		public FolderChanger(string path)
 		{
 			_folderToChange = path;
-
 		}
 
 		public void CheckFilesInQuery(List<FileModel> files)
